@@ -1,31 +1,32 @@
 package config
 
 import (
-    "log"
-    "os"
-
     "github.com/joho/godotenv"
+    "os"
 )
 
 var (
     AppPort    string
     UploadPath string
+    LogPath    string
 )
 
-func LoadConfig() {
-    // Load environment variables from .env file if present
+func init() {
+    // Load environment variables from .env file
     if err := godotenv.Load(); err != nil {
-        log.Println("No .env file found")
+        panic("Error loading .env file")
     }
 
-    // Read environment variables
-    AppPort = os.Getenv("APP_PORT")
-    if AppPort == "" {
-        AppPort = "8000" // default port
-    }
+    // Initialize configuration variables
+    AppPort = getEnv("APP_PORT", "8001")
+    UploadPath = getEnv("UPLOAD_PATH", "./uploads")
+    LogPath = getEnv("LOG_PATH", "./logs")
+}
 
-    UploadPath = os.Getenv("UPLOAD_PATH")
-    if UploadPath == "" {
-        UploadPath = "./uploads" // default upload path
+// getEnv retrieves an environment variable or returns a default value
+func getEnv(key, defaultValue string) string {
+    if value, exists := os.LookupEnv(key); exists {
+        return value
     }
+    return defaultValue
 }

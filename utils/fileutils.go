@@ -14,3 +14,13 @@ func InitUploadDirectory() {
         }
     }
 }
+
+
+func InitLogDirectory() {
+    if _, err := os.Stat(config.LogPath); os.IsNotExist(err) {
+        err := os.Mkdir(config.LogPath, os.ModePerm)
+        if err != nil {
+            log.Fatalf("Failed to create logs directory: %v", err)
+        }
+    }
+}

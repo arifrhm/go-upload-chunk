@@ -2,31 +2,32 @@ package handlers
 
 import (
     "fmt"
-    "io"
     "net/http"
     "os"
     "path/filepath"
     "strconv"
-
     "github.com/labstack/echo/v4"
-    "github.com/arifrhm/go-upload-chunk/config"
     "github.com/arifrhm/go-upload-chunk/services"
+    "github.com/arifrhm/go-upload-chunk/config"
 )
 
-var (
-    tempChunkSuffix = ".part"
-    uploadHTMLFile  = "./upload.html"
-)
+var tempChunkSuffix = ".part"
 
-func UploadHandler(c echo.Context) error {
-    htmlContent, err := os.ReadFile(uploadHTMLFile)
+func RegisterRoutes(e *echo.Echo) {
+    e.GET("/upload", handleUploadPage)
+    e.GET("/resume-upload", handleResumeUpload)
+    e.POST("/upload-chunk", handleUploadChunk)
+}
+
+func handleUploadPage(c echo.Context) error {
+    htmlContent, err := os.ReadFile("upload.html")
     if err != nil {
-        return c.String(http.StatusInternalServerError, fmt.Sprintf("Failed to read HTML file: %v", err))
+        return c.String(http.StatusInternalServerError, "Failed to read HTML file")
     }
     return c.HTMLBlob(http.StatusOK, htmlContent)
 }
 
-func ResumeUploadHandler(c echo.Context) error {
+func handleResumeUpload(c echo.Context) error {
     fileName := c.QueryParam("file_name")
     if fileName == "" {
         return c.JSON(http.StatusBadRequest, map[string]string{"message": "File name is required"})
@@ -47,7 +48,7 @@ func ResumeUploadHandler(c echo.Context) error {
     })
 }
 
-func UploadChunkHandler(c echo.Context) error {
+func handleUploadChunk(c echo.Context) error {
     file, err := c.FormFile("file")
     if err != nil {
         return err
@@ -64,31 +65,25 @@ func UploadChunkHandler(c echo.Context) error {
     }
 
     fileName := c.FormValue("file_name")
-    chunkPath := filepath.Join(config.UploadPath, fmt.Sprintf("%s%s%d", fileName, tempChunkSuffix, chunkIndex))
-
     src, err := file.Open()
     if err != nil {
         return err
     }
     defer src.Close()
 
-    dst, err := os.Create(chunkPath)
-    if err != nil {
-        return err
-    }
-    defer dst.Close()
-
-    if _, err := io.Copy(dst, src); err != nil {
+    if err := services.HandleFileUpload(src, file, fileName, chunkIndex, totalChunks); err != nil {
         return err
     }
 
-    err = services.CheckAndAssembleFile(fileName, totalChunks)
+    // Check if all chunks have been uploaded and assembled
+    chunks, err := filepath.Glob(filepath.Join(config.UploadPath, fmt.Sprintf("%s%s*", fileName, tempChunkSuffix)))
     if err != nil {
-        if err.Error() == "not all chunks are uploaded yet" {
-            return c.JSON(http.StatusOK, map[string]string{"message": "Chunk uploaded successfully, awaiting more chunks"})
-        }
-        return c.JSON(http.StatusInternalServerError, map[string]string{"message": fmt.Sprintf("Error assembling file: %v", err)})
+        return err
     }
 
-    return c.JSON(http.StatusOK, map[string]string{"message": "File uploaded and assembled successfully!"})
+    if len(chunks) == 0 {
+        return c.JSON(http.StatusOK, map[string]string{"message": "All chunks uploaded and file assembled successfully!"})
+    }
+
+    return c.JSON(http.StatusOK, map[string]string{"message": "Chunk uploaded successfully"})
 }

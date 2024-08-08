@@ -1,32 +1,41 @@
 package main
 
 import (
-    "log"
-    "os"
-
     "github.com/labstack/echo/v4"
     "github.com/labstack/echo/v4/middleware"
-    "github.com/arifrhm/go-upload-chunk/config"
     "github.com/arifrhm/go-upload-chunk/handlers"
+    "github.com/arifrhm/go-upload-chunk/config"
     "github.com/arifrhm/go-upload-chunk/utils"
+    "io"
+    "os"
 )
 
 func main() {
-    // Load the configuration
-    config.LoadConfig()
+    // Create log file
+    logFile, err := os.OpenFile(config.LogPath+"/app.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+    if err != nil {
+        panic("Could not open log file: " + err.Error())
+    }
+    // Ensure the file is closed properly
+    defer logFile.Close()
 
+    // Create a MultiWriter to write to both stdout and the log file
+    multiWriter := io.MultiWriter(os.Stdout, logFile)
+
+    // Set the logger output
+    utils.SetLoggerOutput(multiWriter)
+
+    // Create Echo instance
     e := echo.New()
     e.Use(middleware.Logger())
     e.Use(middleware.Recover())
 
-    if _, err := os.Stat(config.UploadPath); os.IsNotExist(err) {
-        // Initialize the upload directory
-        utils.InitUploadDirectory()   
-    }
+    // Use custom log middleware
+    e.Use(utils.CustomLogMiddleware)
 
-    e.GET("/upload", handlers.UploadHandler)
-    e.GET("/resume-upload", handlers.ResumeUploadHandler)
-    e.POST("/upload-chunk", handlers.UploadChunkHandler)
+    // Register your routes
+    handlers.RegisterRoutes(e)
 
-    log.Fatal(e.Start("127.0.0.1:" + config.AppPort))
+    // Start the server
+    e.Logger.Fatal(e.Start("127.0.0.1:" + config.AppPort))
 }
