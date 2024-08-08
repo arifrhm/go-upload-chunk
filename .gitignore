@@ -35,3 +35,8 @@ go.work.sum
 *.pdf
 *.log
 *.pdf.part*
+
+# Testing with puppeteer headless
+node_modules/
+package.json
+package.lock.json
