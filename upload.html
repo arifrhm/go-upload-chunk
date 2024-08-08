@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chunk Upload with Resume</title>
+    <style>
+        #progressBar {
+            width: 100%;
+            background-color: #f3f3f3;
+            border: 1px solid #ccc;
+            margin-top: 10px;
+        }
+        #progressBar span {
+            display: block;
+            height: 20px;
+            background-color: #4caf50;
+            width: 0;
+            color: #fff;
+            text-align: center;
+            line-height: 20px;
+        }
+    </style>
+</head>
+<body>
+    <input type="file" id="fileInput" />
+    <button onclick="startUpload()">Upload</button>
+    <button onclick="resumeUpload()">Resume</button>
+    <div id="progressBar"><span id="progressText">0%</span></div>
+
+    <script>
+        let uploadQueue = {};
+        let currentChunkIndex = 0;
+        let totalChunks = 0;
+        let fileName = '';
+        let fileSize = 0;
+
+        function startUpload() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            fileSize = file.size;
+            const chunkSize = 1024 * 1024; // 1MB
+            totalChunks = Math.ceil(fileSize / chunkSize);
+            fileName = file.name;
+            uploadQueue = {};
+
+            for (let i = 0; i < totalChunks; i++) {
+                const start = i * chunkSize;
+                const end = Math.min(start + chunkSize, fileSize);
+                const chunk = file.slice(start, end);
+                uploadQueue[i] = { chunk, index: i };
+            }
+
+            currentChunkIndex = 0;
+            uploadNextChunk();
+        }
+
+        function uploadNextChunk() {
+            if (currentChunkIndex >= totalChunks) {
+                console.log('Upload complete');
+                return;
+            }
+
+            if (!uploadQueue[currentChunkIndex]) {
+                currentChunkIndex++;
+                uploadNextChunk();
+                return;
+            }
+
+            const { chunk, index } = uploadQueue[currentChunkIndex];
+            const formData = new FormData();
+            formData.append('file', chunk);
+            formData.append('chunk_index', index);
+            formData.append('total_chunks', totalChunks);
+            formData.append('file_name', fileName);
+
+            fetch('/upload-chunk', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.message.includes('successfully')) {
+                    delete uploadQueue[currentChunkIndex];
+                    currentChunkIndex++;
+                    updateProgressBar();
+                    uploadNextChunk();
+                } else {
+                    console.error('Error:', data.message);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        function updateProgressBar() {
+            const progress = Math.round((currentChunkIndex / totalChunks) * 100);
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            progressBar.querySelector('span').style.width = progress + '%';
+            progressText.textContent = progress + '%';
+        }
+
+        function resumeUpload() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            fileName = file?.name;
+            fileSize = file?.size;
+            const chunkSize = 1024 * 1024; // 1MB
+
+            if (!fileName) {
+                console.error('No file selected');
+                return;
+            }
+
+            fetch('/resume-upload?file_name=' + encodeURIComponent(fileName), {
+                method: 'GET'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.chunk_index !== undefined) {
+                    currentChunkIndex = data.chunk_index;
+                    totalChunks = Math.ceil(fileSize / chunkSize);
+                    uploadQueue = {};
+
+                    for (let i = currentChunkIndex; i < totalChunks; i++) {
+                        const start = i * chunkSize;
+                        const end = Math.min(start + chunkSize, fileSize);
+                        const chunk = file.slice(start, end);
+                        uploadQueue[i] = { chunk, index: i };
+                    }
+
+                    updateProgressBar();
+                    uploadNextChunk();
+                } else {
+                    console.error('Error:', data.message);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+    </script>
+</body>
+</html>
