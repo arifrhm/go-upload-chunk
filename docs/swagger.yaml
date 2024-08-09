@@ -1,0 +1,91 @@
+definitions:
+  handlers.ResumeUploadResponse:
+    properties:
+      chunk_index:
+        type: integer
+      file_name:
+        type: string
+      total_chunks:
+        type: integer
+    type: object
+  handlers.UploadChunkResponse:
+    properties:
+      message:
+        type: string
+      request_id:
+        type: string
+    type: object
+info:
+  contact: {}
+paths:
+  /resume-upload:
+    get:
+      consumes:
+      - application/json
+      description: Check uploaded chunks and return status
+      parameters:
+      - description: File name
+        in: query
+        name: file_name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.ResumeUploadResponse'
+      summary: Resume Upload
+      tags:
+      - upload
+  /upload:
+    get:
+      description: Serve the upload HTML page
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+      summary: Upload Page
+      tags:
+      - upload
+  /upload-chunk:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Handle file chunk upload
+      parameters:
+      - description: File chunk
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: Chunk index
+        in: formData
+        name: chunk_index
+        required: true
+        type: integer
+      - description: Total chunks
+        in: formData
+        name: total_chunks
+        required: true
+        type: integer
+      - description: File name
+        in: formData
+        name: file_name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.UploadChunkResponse'
+      summary: Upload Chunk
+      tags:
+      - upload
+swagger: "2.0"

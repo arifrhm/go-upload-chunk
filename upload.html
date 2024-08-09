@@ -69,10 +69,10 @@
 
             const { chunk, index } = uploadQueue[currentChunkIndex];
             const formData = new FormData();
-            formData.append('file', chunk);
             formData.append('chunk_index', index);
             formData.append('total_chunks', totalChunks);
             formData.append('file_name', fileName);
+            formData.append('file', chunk);
 
             fetch('/upload-chunk', {
                 method: 'POST',

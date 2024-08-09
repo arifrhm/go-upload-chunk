@@ -4,6 +4,7 @@ import (
     "fmt"
     "io"
     "os"
+    "log"
     "path/filepath"
     "mime/multipart"
     "github.com/arifrhm/go-upload-chunk/config"
@@ -18,6 +19,8 @@ func CheckAndAssembleFile(fileName string, totalChunks int) error {
     if err != nil {
         return err
     }
+    log.Println("chunks","totalChunks after inside function")
+    log.Println(chunks,totalChunks)
 
     if len(chunks) == totalChunks {
         finalPath := filepath.Join(config.UploadPath, fileName)

@@ -8,6 +8,8 @@ import (
     "github.com/arifrhm/go-upload-chunk/utils"
     "io"
     "os"
+    "github.com/swaggo/echo-swagger"
+    _ "github.com/arifrhm/go-upload-chunk/docs" // Import generated docs
 )
 
 func main() {
@@ -32,7 +34,9 @@ func main() {
 
     // Use custom log middleware
     e.Use(utils.CustomLogMiddleware)
-
+    e.Use(utils.RequestIDMiddleware)
+    // Swagger UI route
+    e.GET("/swagger/*", echoSwagger.WrapHandler)
     // Register your routes
     handlers.RegisterRoutes(e)
 
