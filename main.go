@@ -35,6 +35,13 @@ func main() {
     // Use custom log middleware
     e.Use(utils.CustomLogMiddleware)
     e.Use(utils.RequestIDMiddleware)
+
+    // CORS middleware using config package
+    e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+        AllowOrigins: config.AllowedOrigins,
+        AllowMethods: []string{echo.GET, echo.POST},
+    }))
+
     // Swagger UI route
     e.GET("/swagger/*", echoSwagger.WrapHandler)
     // Register your routes
