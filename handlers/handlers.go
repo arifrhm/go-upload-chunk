@@ -5,11 +5,12 @@ import (
     "net/http"
     "os"
     "path/filepath"
-    "strconv"
+    "log"
     "github.com/labstack/echo/v4"
     "github.com/arifrhm/go-upload-chunk/services"
     "github.com/arifrhm/go-upload-chunk/config"
     "github.com/arifrhm/go-upload-chunk/dto"
+    "github.com/arifrhm/go-upload-chunk/middleware"
 )
 
 var (
@@ -19,7 +20,7 @@ var (
 func RegisterRoutes(e *echo.Echo) {
     e.GET("/upload", handleUploadPage)
     e.GET("/resume-upload", handleResumeUpload)
-    e.POST("/upload-chunk", handleUploadChunk)
+    e.POST("/upload-chunk", middleware.FileUploadMiddleware(handleUploadChunk))
 }
 
 // @title           File Upload API
@@ -96,40 +97,44 @@ func handleResumeUpload(c echo.Context) error {
 func handleUploadChunk(c echo.Context) error {
     requestID := c.Get("request_id").(string)
 
+    // Retrieve metadata from middleware context
+    chunkIndex, ok := c.Get("chunkIndex").(int)
+    if !ok {
+        log.Printf("[ERROR] Request ID: %s - Invalid or missing chunkIndex", requestID)
+        return c.JSON(http.StatusInternalServerError, "Internal server error")
+    }
+
+    totalChunks, ok := c.Get("totalChunks").(int)
+    if !ok {
+        log.Printf("[ERROR] Request ID: %s - Invalid or missing totalChunks", requestID)
+        return c.JSON(http.StatusInternalServerError, "Internal server error")
+    }
+
     file, err := c.FormFile("file")
     if err != nil {
+        log.Printf("[ERROR] Request ID: %s - Failed to retrieve file: %v", requestID, err)
         return c.JSON(http.StatusBadRequest, map[string]string{"message": "File is required"})
-    }
-
-    chunkIndex, err := strconv.Atoi(c.FormValue("chunk_index"))
-    if err != nil {
-        return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid chunk index"})
-    }
-
-    totalChunks, err := strconv.Atoi(c.FormValue("total_chunks"))
-    if err != nil {
-        return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid total chunks"})
     }
 
     fileName := c.FormValue("file_name")
     if fileName == "" {
+        log.Printf("[ERROR] Request ID: %s - File name is missing", requestID)
         return c.JSON(http.StatusBadRequest, map[string]string{"message": "File name is required"})
     }
+
+    // Log important details
+    log.Printf("[INFO] Request ID: %s - Uploading chunk %d of %d for file %s", requestID, chunkIndex, totalChunks, fileName)
 
     // Open the file and handle the upload
     src, err := file.Open()
     if err != nil {
+        log.Printf("[ERROR] Request ID: %s - Failed to open file: %v", requestID, err)
         return err
     }
     defer src.Close()
 
-    if err := services.HandleFileUpload(
-        src,
-        file,
-        fileName,
-        chunkIndex,
-        totalChunks,
-    ); err != nil {
+    if err := services.HandleFileUpload(src, file, fileName, chunkIndex, totalChunks); err != nil {
+        log.Printf("[ERROR] Request ID: %s - Error in file upload: %v", requestID, err)
         return err
     }
 
@@ -139,10 +144,11 @@ func handleUploadChunk(c echo.Context) error {
 
     // Check if all chunks are uploaded and assembled
     if chunkIndex == totalChunks-1 {
-        // Clear the queue after file assembly
         response.Message = "All chunks uploaded and file assembled successfully!"
+        log.Printf("[INFO] Request ID: %s - File %s successfully assembled", requestID, fileName)
     } else {
         response.Message = "Chunk uploaded successfully"
+        log.Printf("[INFO] Request ID: %s - Chunk %d of %d uploaded successfully", requestID, chunkIndex, totalChunks)
     }
 
     return c.JSON(http.StatusOK, response)

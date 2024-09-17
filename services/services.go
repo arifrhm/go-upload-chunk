@@ -8,7 +8,6 @@ import (
     "path/filepath"
     "mime/multipart"
     "github.com/arifrhm/go-upload-chunk/config"
-    "github.com/arifrhm/go-upload-chunk/utils"
 )
 
 var tempChunkSuffix = ".part"
@@ -50,16 +49,6 @@ func CheckAndAssembleFile(fileName string, totalChunks int) error {
 
 // HandleFileUpload handles the file upload and validates the file type only for the first chunk.
 func HandleFileUpload(file multipart.File, fileHeader *multipart.FileHeader, fileName string, chunkIndex, totalChunks int) error {
-    if chunkIndex == 0 {
-        if err := utils.ValidateFileType(fileHeader); err != nil {
-            return err
-        }
-    }
-
-    if err := utils.ValidateFileSize(file); err != nil {
-        return err
-    }
-
     chunkPath := filepath.Join(config.UploadPath, fmt.Sprintf("%s%s%d", fileName, tempChunkSuffix, chunkIndex))
 
     dst, err := os.Create(chunkPath)
