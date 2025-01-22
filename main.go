@@ -47,7 +47,6 @@ func main() {
 	e.GET("/swagger/*", echoSwagger.WrapHandler)
 	// Register your routes
 	handlers.RegisterRoutes(e)
-
 	// Start the server
-	e.Logger.Fatal(e.Start(config.AppHost + config.AppPort))
+	e.Logger.Fatal(e.Start(config.AppHost + ":" + config.AppPort))
 }
